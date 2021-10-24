@@ -60,6 +60,17 @@ def vault(gov, rewards, guardian, ftm_dai, pm):
     yield vault
 
 @pytest.fixture
+def Vault(pm):
+    yield pm(config["dependencies"][0]).Vault
+
+@pytest.fixture
+def live_ftm_dai_strategy(
+    Strategy
+): 
+    yield Strategy.at('0x754133e0f67CB51263d6d5F41f2dF1a58a9D36b7')
+
+
+@pytest.fixture
 def strategy(
     strategist,
     keeper,
@@ -76,6 +87,7 @@ def strategy(
     screamPlugin = strategist.deploy(GenericScream, strategy, "Scream", scrDai)
     assert screamPlugin.underlyingBalanceStored() == 0
     scapr = screamPlugin.compBlockShareInWant(0, False) * 3154 * 10**4 
+    print(10_000_000 * 1e18)
     print(scapr/1e18)
     print((screamPlugin.apr() - scapr)/1e18)
 

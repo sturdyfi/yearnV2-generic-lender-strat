@@ -34,6 +34,8 @@ contract GenericScream is GenericLenderBase {
 
     uint256 public dustThreshold;
 
+    bool public ignorePrinting;
+
     uint256 public minScreamToSell = 0 ether;
 
     CErc20I public cToken;
@@ -75,6 +77,11 @@ contract GenericScream is GenericLenderBase {
     //adjust dust threshol
     function setDustThreshold(uint256 amount) external management {
         dustThreshold = amount;
+    }
+
+    //adjust dust threshol
+    function setIgnorePrinting(bool _ignorePrinting) external management {
+        ignorePrinting = _ignorePrinting;
     }
 
     function _nav() internal view returns (uint256) {
@@ -211,7 +218,10 @@ contract GenericScream is GenericLenderBase {
             }
             
         }
-        _disposeOfComp();
+        if(!ignorePrinting){
+            _disposeOfComp();
+        }
+        
         looseBalance = want.balanceOf(address(this));
         want.safeTransfer(address(strategy), looseBalance);
         return looseBalance;
@@ -264,12 +274,12 @@ contract GenericScream is GenericLenderBase {
                 cToken.redeem(liquidityInCTokens);
             }
         }
-        return all;
 
         uint256 looseBalance = want.balanceOf(address(this));
         if(looseBalance > 0){
             want.safeTransfer(address(strategy), looseBalance);
         }
+        return all;
         
     }
 

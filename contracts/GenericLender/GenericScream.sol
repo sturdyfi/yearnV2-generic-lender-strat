@@ -115,7 +115,7 @@ contract GenericScream is GenericLenderBase {
     function compBlockShareInWant(uint256 change, bool add) public view returns (uint256){
         //comp speed is amount to borrow or deposit (so half the total distribution for want)
         uint256 distributionPerBlock = ComptrollerI(unitroller).compSpeeds(address(cToken));
-        
+
         //convert to per dolla
         uint256 totalSupply = cToken.totalSupply().mul(cToken.exchangeRateStored()).div(1e18);
         if(add){
@@ -144,18 +144,7 @@ contract GenericScream is GenericLenderBase {
         if (_amount == 0) {
             return 0;
         }
-        address[] memory path;
-        if(start == wftm){
-            path = new address[](2);
-            path[0] = wftm;
-            path[1] = end;
-        }else{
-            path = new address[](3);
-            path[0] = start;
-            path[1] = wftm;
-            path[2] = end;
-        }
-
+        address[] memory path = getTokenOutPath(start, end);
         uint256[] memory amounts = IUniswapV2Router02(spookyRouter).getAmountsOut(_amount, path);
 
         return amounts[amounts.length - 1];
@@ -196,7 +185,7 @@ contract GenericScream is GenericLenderBase {
             }else{
                 return 0;
             }
-            
+
         }
 
         if (looseBalance >= amount) {
@@ -216,7 +205,7 @@ contract GenericScream is GenericLenderBase {
             if(toWithdraw > dustThreshold){
                 require(cToken.redeemUnderlying(toWithdraw) == 0, "ctoken: redeemUnderlying fail");
             }
-            
+
         }
         if(!ignorePrinting){
             _disposeOfComp();
@@ -237,12 +226,20 @@ contract GenericScream is GenericLenderBase {
         uint256 _scream = IERC20(scream).balanceOf(address(this));
 
         if (_scream > minScreamToSell) {
-            address[] memory path = new address[](3);
-            path[0] = scream;
-            path[1] = wftm;
-            path[2] = address(want);
-
+            address[] memory path = getTokenOutPath(scream, address(want));
             IUniswapV2Router02(spookyRouter).swapExactTokensForTokens(_scream, uint256(0), path, address(this), now);
+        }
+    }
+
+    function getTokenOutPath(address _token_in, address _token_out) internal pure returns (address[] memory _path) {
+        bool is_wftm = _token_in == address(wftm) || _token_out == address(wftm);
+        _path = new address[](is_wftm ? 2 : 3);
+        _path[0] = _token_in;
+        if (is_wftm) {
+            _path[1] = _token_out;
+        } else {
+            _path[1] = address(wftm);
+            _path[2] = _token_out;
         }
     }
 
@@ -260,7 +257,7 @@ contract GenericScream is GenericLenderBase {
 
         if (liquidityInCTokens > 2) {
             liquidityInCTokens = liquidityInCTokens-1;
-           
+
             if (amountInCtokens <= liquidityInCTokens) {
                 //we can take all
                 all = true;

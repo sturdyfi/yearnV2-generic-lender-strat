@@ -143,4 +143,5 @@ interface ComptrollerI {
         );
 
     function compSpeeds(address ctoken) external view returns (uint256);
+    function getAllMarkets() external view returns (address[] memory markets);
 }

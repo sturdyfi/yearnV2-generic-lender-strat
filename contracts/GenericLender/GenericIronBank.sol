@@ -232,6 +232,17 @@ contract GenericIronBank is GenericLenderBase {
         return looseBalance;
     }
 
+    function manualClaimAndDontSell() external management{
+        address[] memory holders = new address[](1);
+        holders[0] = address(this);
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(cToken);
+        address[] memory rewards = new address[](1);
+        rewards[0] = ib;
+
+        liquidityMining.claimRewards(holders, tokens, rewards, false, true);
+    }
+
     function _disposeOfComp() internal {
 
         if(liquidityMining.rewardTokensMap(ib)){

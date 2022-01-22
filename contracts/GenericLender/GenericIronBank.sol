@@ -37,7 +37,6 @@ contract GenericIronBank is GenericLenderBase {
     address public constant ib = address(0x00a35FD824c717879BF370E70AC6868b95870Dfb);
     address public constant wftm = address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
     iLiquidityMining public liquidityMining;
-    address public unitroller;
 
     uint256 public dustThreshold;
 
@@ -62,7 +61,6 @@ contract GenericIronBank is GenericLenderBase {
     function _initialize(address _cToken) internal {
         require(address(cToken) == address(0), "GenericIB already initialized");
         cToken = CErc20I(_cToken);
-        unitroller = cToken.comptroller();
         liquidityMining = iLiquidityMining(address(0xa9d61326709B5C2D5897e0753998DFf7F1e974Fe));
         require(cToken.underlying() == address(want), "WRONG CTOKEN");
         want.safeApprove(_cToken, uint256(-1));

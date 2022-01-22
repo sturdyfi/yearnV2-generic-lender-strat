@@ -17,6 +17,7 @@ import "./GenericLenderBase.sol";
 interface iLiquidityMining{
     function claimRewards(address[] memory holders, address[] memory cTokens, address[] memory rewards, bool borrowers, bool suppliers) external;
     function rewardSupplySpeeds(address, address) external view returns (uint256, uint256, uint256);
+    function rewardTokensMap(address) external view returns (bool);
 }
 
 /********************
@@ -233,16 +234,17 @@ contract GenericIronBank is GenericLenderBase {
 
     function _disposeOfComp() internal {
 
-        
-        address[] memory holders = new address[](1);
-        holders[0] = address(this);
-        address[] memory tokens = new address[](1);
-        tokens[0] = address(cToken);
-        address[] memory rewards = new address[](1);
-        rewards[0] = ib;
+        if(liquidityMining.rewardTokensMap(ib)){
+            address[] memory holders = new address[](1);
+            holders[0] = address(this);
+            address[] memory tokens = new address[](1);
+            tokens[0] = address(cToken);
+            address[] memory rewards = new address[](1);
+            rewards[0] = ib;
 
+            liquidityMining.claimRewards(holders, tokens, rewards, false, true);
+        }
         
-        liquidityMining.claimRewards(holders, tokens, rewards, false, true);
 
         uint256 _scream = IERC20(ib).balanceOf(address(this));
 

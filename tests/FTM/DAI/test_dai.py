@@ -62,6 +62,7 @@ def test_normal_activity(
         chain.sleep(waitBlock)
         # print(f'\n----harvest----')
         scrDai.mint(0,{"from": whale})
+        crDai.mint(0,{"from": whale})
         strategy.harvest({"from": strategist})
 
         # genericStateOfStrat(strategy, currency, vault)

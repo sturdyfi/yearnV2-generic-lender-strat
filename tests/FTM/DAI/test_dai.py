@@ -7,6 +7,7 @@ import brownie
 def test_normal_activity(
     ftm_dai,
     scrDai,
+    crDai,
     chain,
     whale,
     rando,
@@ -27,7 +28,7 @@ def test_normal_activity(
     deposit_limit = 10_000
     vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 1000, {"from": gov})
 
-    whale_deposit = 1_000_000 * 1e18
+    whale_deposit = 100_000 * 1e18
     vault.deposit(whale_deposit, {"from": whale})
     chain.sleep(10)
     chain.mine(1)

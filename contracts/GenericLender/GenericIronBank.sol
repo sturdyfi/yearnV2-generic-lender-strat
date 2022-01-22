@@ -263,11 +263,11 @@ contract GenericIronBank is GenericLenderBase {
         }
         
 
-        uint256 _scream = IERC20(ib).balanceOf(address(this));
+        uint256 _ib = IERC20(ib).balanceOf(address(this));
 
-        if (_scream > minIbToSell) {
+        if (_ib > minIbToSell) {
             address[] memory path = getTokenOutPath(ib, address(want));
-            IUniswapV2Router02(spookyRouter).swapExactTokensForTokens(_scream, uint256(0), path, address(this), now);
+            IUniswapV2Router02(spookyRouter).swapExactTokensForTokens(_ib, uint256(0), path, address(this), now);
         }
     }
 

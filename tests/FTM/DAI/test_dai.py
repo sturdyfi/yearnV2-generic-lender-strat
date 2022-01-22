@@ -81,7 +81,7 @@ def test_normal_activity(
         time = (i + 1) * waitBlock
         assert time != 0
         apr = (totalReturns / startingBalance) * (blocks_per_year / time)
-        assert apr > 0 and apr < 1
+        assert apr > 0 and apr < 10
         # print(apr)
         print(f"implied apr: {apr:.8%}")
 

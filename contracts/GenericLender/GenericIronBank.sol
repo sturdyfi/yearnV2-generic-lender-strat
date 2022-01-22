@@ -34,6 +34,7 @@ contract GenericIronBank is GenericLenderBase {
 
     uint256 private constant blocksPerYear = 3154 * 10**4;
     address public constant spookyRouter = address(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
+    address public constant spiritRouter = address(0x16327E3FbDaCA3bcF7E38F5Af2599D2DDc33aE52);
     address public constant ib = address(0x00a35FD824c717879BF370E70AC6868b95870Dfb);
     address public constant wftm = address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
     iLiquidityMining public liquidityMining;
@@ -41,6 +42,8 @@ contract GenericIronBank is GenericLenderBase {
     uint256 public dustThreshold;
 
     bool public ignorePrinting;
+
+    bool public useSpirit;
 
     uint256 public minIbToSell = 0 ether;
 
@@ -65,6 +68,7 @@ contract GenericIronBank is GenericLenderBase {
         require(cToken.underlying() == address(want), "WRONG CTOKEN");
         want.safeApprove(_cToken, uint256(-1));
         IERC20(ib).safeApprove(spookyRouter, uint256(-1));
+        IERC20(wftm).safeApprove(spiritRouter, uint256(-1));
         dustThreshold = 1_000_000_000; //depends on want
     }
 
@@ -92,6 +96,10 @@ contract GenericIronBank is GenericLenderBase {
 
     function setMinIbToSellThreshold(uint256 amount) external management {
         minIbToSell = amount;
+    }
+
+    function setUseSpirit(bool _useSpirit) external management {
+        useSpirit = _useSpirit;
     }
 
     //adjust dust threshol
@@ -265,9 +273,19 @@ contract GenericIronBank is GenericLenderBase {
 
         uint256 _ib = IERC20(ib).balanceOf(address(this));
 
-        if (_ib > minIbToSell) {
-            address[] memory path = getTokenOutPath(ib, address(want));
-            IUniswapV2Router02(spookyRouter).swapExactTokensForTokens(_ib, uint256(0), path, address(this), now);
+        if (_ib > minIbToSell) { 
+            if(!useSpirit){
+                address[] memory path = getTokenOutPath(ib, address(want));
+                IUniswapV2Router02(spookyRouter).swapExactTokensForTokens(_ib, uint256(0), path, address(this), now);
+            }else{
+                address[] memory path = getTokenOutPath(ib, wftm);
+                IUniswapV2Router02(spookyRouter).swapExactTokensForTokens(_ib, uint256(0), path, address(this), now);
+
+                path = getTokenOutPath(wftm, address(want));
+                uint256 _wftm = IERC20(wftm).balanceOf(address(this));
+                IUniswapV2Router02(spiritRouter).swapExactTokensForTokens(_wftm, uint256(0), path, address(this), now);
+            }
+            
         }
     }
 

@@ -88,6 +88,10 @@ contract GenericIronBank is GenericLenderBase {
         dustThreshold = amount;
     }
 
+    function setliquidityMining(address _liqMining) external management {
+        liquidityMining = iLiquidityMining(_liqMining);
+    }
+
     function setMinIbToSellThreshold(uint256 amount) external management {
         minIbToSell = amount;
     }
@@ -126,6 +130,10 @@ contract GenericIronBank is GenericLenderBase {
     }
 
     function compBlockShareInWant(uint256 change, bool add) public view returns (uint256){
+
+        if(ignorePrinting){
+            return 0;
+        }
         //comp speed is amount to borrow or deposit (so half the total distribution for want)
         //uint256 distributionPerBlock = ComptrollerI(unitroller).compSpeeds(address(cToken));
         (uint distributionPerBlock, , uint supplyEnd) = liquidityMining.rewardSupplySpeeds(ib, address(cToken));

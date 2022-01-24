@@ -106,6 +106,45 @@ def test_normal_activity(
 
     #print_lenders(wftm_genlender)
 
+def test_yfi_hundred(accounts,
+    Contract,
+    GenericIronBank,
+    GenericCream):
+    gov = accounts.at('0xC0E2830724C946a6748dDFE09753613cd38f6767', force=True)
+
+    hYFI = Contract('0xC0f112479c83a603Ac4Dc76f616536389a85a917')
+    yfi_genlender = Contract('0xDf262B43bea0ACd0dD5832cf2422e0c9b2C539dc')
+    genericCream = Contract('0x5A1cB716a389b8F8658D5d471391E530C3e570AA')
+
+    #tx = genericCream.cloneCreamLender(yfi_genlender, "Hundred Lender YFI", hYFI, {'from': gov})
+    #hPlugin = GenericCream.at(tx.return_value)
+    hPlugin = GenericCream.at('0xF4D1Ab2169eaC23043519cABcf211ec7259dbc7c')
+    #yfi_genlender.addLender(hPlugin, {'from': gov})
+
+    yfi_vault = Contract('0x2C850cceD00ce2b14AA9D658b7Cad5dF659493Db')
+    
+
+    vedao = Contract('0x6a59081C7d5ac3e82c58D5f595ed25D55E71EBDa')
+    yfi_vault.updateStrategyDebtRatio(yfi_genlender, 500, {"from": gov})  
+    yfi_vault.updateStrategyDebtRatio(vedao, 9500, {"from": gov}) 
+    
+    
+    geniron = '0x07D635b3Cb3F63d6ae20720748f1A3eAaf3e8903'
+    print_lenders(yfi_genlender)
+    yfi_genlender.harvest({"from": gov})
+    vedao.harvest({"from": gov})
+    
+
+    #manualAll = [[hPlugin, 500], [geniron, 500]]
+    #yfi_genlender.manualAllocation(manualAll, {"from": gov})
+
+    #yfi_genlender.setKeeper('0x59e5C0BA3008E85F0cA59586EbC399bC1F47a42B', {"from": gov})
+    
+    print_lenders(yfi_genlender)
+
+
+
+
 
 def print_lenders(strategy, decimals=18):
     form = "{:.2%}"

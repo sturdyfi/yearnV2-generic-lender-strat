@@ -14,18 +14,24 @@ import "../Interfaces/UniswapInterfaces/IUniswapV2Router02.sol";
 
 import "./GenericLenderBase.sol";
 
-interface iLiquidityMining{
+interface iGuage{
     function claimRewards(address[] memory holders, address[] memory cTokens, address[] memory rewards, bool borrowers, bool suppliers) external;
     function rewardSupplySpeeds(address, address) external view returns (uint256, uint256, uint256);
     function rewardTokensMap(address) external view returns (bool);
     function deposit(uint256) external;
+    function withdraw(uint256) external;
     function minter() external view returns (address);
+    function controller() external view returns (address);
+    function working_supply() external view returns (uint256);
+    function inflation_rate() external view returns (uint256);
 }
 interface iMinter{
-    function claimRewards(address[] memory holders, address[] memory cTokens, address[] memory rewards, bool borrowers, bool suppliers) external;
-    function rewardSupplySpeeds(address, address) external view returns (uint256, uint256, uint256);
-    function rewardTokensMap(address) external view returns (bool);
+    function mint(address) external;
 }
+interface iController{
+    function guage_relative_weight(address) external view returns (uint256);
+}
+
 
 /********************
  *   A lender plugin for LenderYieldOptimiser for any erc20 asset on compound (not eth)
@@ -76,6 +82,7 @@ contract GenericHundredFinance is GenericLenderBase {
         require(address(cToken) == address(0), "GenericIB already initialized");
         cToken = CErc20I(_cToken);
         guage = iLiquidityMining(_guage);
+        minter = guage.minter();
         require(cToken.underlying() == address(want), "WRONG CTOKEN");
         want.safeApprove(_cToken, uint256(-1));
         IERC20(hnd).safeApprove(spookyRouter, uint256(-1));
@@ -104,6 +111,9 @@ contract GenericHundredFinance is GenericLenderBase {
 
     function setGuage(address _guage) external govOnly {
         guage = iLiquidityMining(_guage);
+        if(_guage != address(0)){
+            minter = guage.minter();
+        }
     }
 
     function setMinIbToSellThreshold(uint256 amount) external management {
@@ -149,9 +159,35 @@ contract GenericHundredFinance is GenericLenderBase {
 
     function compBlockShareInWant(uint256 change, bool add) public view returns (uint256){
 
-        if(ignorePrinting){
+        if(ignorePrinting || minter == address(0)){
             return 0;
         }
+        uint256 gauge_weight = controller.gauge_relative_weight(gauge_address) ;
+        uint256 gauge_working_supply = gauge.working_supply();
+        if (gauge_working_supply == 0){
+            return 0;
+        }
+
+        gauge_inflation_rate = gauge.inflation_rate();
+    pool = contract(pool_address)
+    pool_price = pool.get_virtual_price(block_identifier=block)
+
+    base_asset_price = get_price(lp_token, block=block) or 1
+
+    crv_price = get_price(curve.crv, block=block)
+
+    yearn_voter = addresses[chain.id]['yearn_voter_proxy']
+    y_working_balance = gauge.working_balances(yearn_voter, block_identifier=block)
+    y_gauge_balance = gauge.balanceOf(yearn_voter, block_identifier=block)
+
+    base_apr = (
+        gauge_inflation_rate
+        * gauge_weight
+        * (SECONDS_PER_YEAR / gauge_working_supply)
+        * (PER_MAX_BOOST / pool_price)
+        * crv_price
+    ) / base_asset_price
+
         //comp speed is amount to borrow or deposit (so half the total distribution for want)
         //uint256 distributionPerBlock = ComptrollerI(unitroller).compSpeeds(address(cToken));
         (uint distributionPerBlock, , uint supplyEnd) = guage.rewardSupplySpeeds(hnd, address(cToken));
@@ -259,46 +295,37 @@ contract GenericHundredFinance is GenericLenderBase {
     }
 
     function manualClaimAndDontSell() external management{
-        address[] memory holders = new address[](1);
-        holders[0] = address(this);
-        address[] memory tokens = new address[](1);
-        tokens[0] = address(cToken);
-        address[] memory rewards = new address[](1);
-        rewards[0] = hnd;
-
-        guage.claimRewards(holders, tokens, rewards, false, true);
+        iMinter(minter).mint(address(guage));
     }
 
+    //spookyswap is best for hnd/wftm. we check if there is a better path for the second lot
     function _disposeOfComp() internal {
 
-        if(guage.rewardTokensMap(hnd)){
-            address[] memory holders = new address[](1);
-            holders[0] = address(this);
-            address[] memory tokens = new address[](1);
-            tokens[0] = address(cToken);
-            address[] memory rewards = new address[](1);
-            rewards[0] = hnd;
+        if(minter != address(0)){
+            
+            iMinter(minter).mint(address(guage));
+            uint256 _ib = IERC20(hnd).balanceOf(address(this));
 
-            guage.claimRewards(holders, tokens, rewards, false, true);
+            if (_ib > minIbToSell) { 
+                if(!useSpirit){
+                    address[] memory path = getTokenOutPath(hnd, address(want));
+                    IUniswapV2Router02(spookyRouter).swapExactTokensForTokens(_ib, uint256(0), path, address(this), now);
+                }else{
+                    address[] memory path = getTokenOutPath(hnd, wftm);
+                    IUniswapV2Router02(spookyRouter).swapExactTokensForTokens(_ib, uint256(0), path, address(this), now);
+
+                    path = getTokenOutPath(wftm, address(want));
+                    uint256 _wftm = IERC20(wftm).balanceOf(address(this));
+                    IUniswapV2Router02(spiritRouter).swapExactTokensForTokens(_wftm, uint256(0), path, address(this), now);
+                }
+            
+            }
         }
         
 
-        uint256 _ib = IERC20(hnd).balanceOf(address(this));
+        
 
-        if (_ib > minIbToSell) { 
-            if(!useSpirit){
-                address[] memory path = getTokenOutPath(hnd, address(want));
-                IUniswapV2Router02(spookyRouter).swapExactTokensForTokens(_ib, uint256(0), path, address(this), now);
-            }else{
-                address[] memory path = getTokenOutPath(hnd, wftm);
-                IUniswapV2Router02(spookyRouter).swapExactTokensForTokens(_ib, uint256(0), path, address(this), now);
-
-                path = getTokenOutPath(wftm, address(want));
-                uint256 _wftm = IERC20(wftm).balanceOf(address(this));
-                IUniswapV2Router02(spiritRouter).swapExactTokensForTokens(_wftm, uint256(0), path, address(this), now);
-            }
-            
-        }
+        
     }
 
     function getTokenOutPath(address _token_in, address _token_out) internal pure returns (address[] memory _path) {

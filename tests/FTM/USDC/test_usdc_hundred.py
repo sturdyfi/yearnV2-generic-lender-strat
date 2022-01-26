@@ -29,7 +29,7 @@ def test_normal_activity(
     deposit_limit = 10_000
     vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 1000, {"from": gov})
 
-    whale_deposit = 100_000 * 1e6
+    whale_deposit = 1_000_000 * 1e6
     vault.deposit(whale_deposit, {"from": whale})
     chain.sleep(10)
     chain.mine(1)
@@ -64,7 +64,7 @@ def test_normal_activity(
         difff = profit - totaleth
         # print(f'Diff: {difff}')
 
-        blocks_per_year = 3154 * 10**4
+        blocks_per_year = 365*60*60*24
         assert startingBalance != 0
         time = (i + 1) * waitBlock
         assert time != 0

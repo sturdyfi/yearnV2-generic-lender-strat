@@ -52,7 +52,7 @@ def whale(accounts, web3, weth):
     acc = accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
 
     # lots of weth account
-    wethAcc = accounts.at("0x767Ecb395def19Ab8d1b2FCc89B3DDfBeD28fD6b", force=True)
+    wethAcc = accounts.at("0x8EB8a3b98659Cce290402893d0123abb75E3ab28", force=True)
     weth.approve(acc, 2 ** 256 - 1, {"from": wethAcc})
     weth.transfer(acc, weth.balanceOf(wethAcc), {"from": wethAcc})
 
@@ -134,6 +134,10 @@ def crUsdc(interface):
 def aUsdc(interface):
     yield interface.IAToken("0xBcca60bB61934080951369a648Fb03DF4F96263C")
 
+@pytest.fixture
+def sUsdc(interface):
+    yield interface.IAToken("0x51D5c5D784334a4b52a07AC13D9db79cBefa1642")
+
 
 @pytest.fixture(scope="module", autouse=True)
 def shared_setup(module_isolation):
@@ -159,11 +163,13 @@ def strategy(
     crUsdc,
     cUsdc,
     aUsdc,
+    sUsdc,
     Strategy,
     GenericCompound,
     GenericCream,
     GenericDyDx,
     GenericAave,
+    GenericSturdy,
     chain
 ):
     strategy = strategist.deploy(Strategy, vault)
@@ -175,6 +181,7 @@ def strategy(
     creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdc)
     dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
     aavePlugin = strategist.deploy(GenericAave, strategy, "Aave", aUsdc, False)
+    sturdyPlugin = strategist.deploy(GenericSturdy, strategy, "Sturdy", sUsdc, False)
 
     strategy.addLender(creamPlugin, {"from": gov})
     assert strategy.numLenders() == 1
@@ -184,5 +191,7 @@ def strategy(
     assert strategy.numLenders() == 3
     strategy.addLender(aavePlugin, {"from": gov})
     assert strategy.numLenders() == 4
+    strategy.addLender(sturdyPlugin, {"from": gov})
+    assert strategy.numLenders() == 5
 
     yield strategy

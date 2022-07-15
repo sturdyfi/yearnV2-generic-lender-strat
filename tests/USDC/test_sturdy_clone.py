@@ -14,8 +14,8 @@ def test_aave_clone(
     vault,
     Strategy,
     strategy,
-    GenericAave,
-    aUsdc,
+    GenericSturdy,
+    sUsdc,
 ):
     # Clone magic
     tx = strategy.clone(vault)
@@ -29,18 +29,18 @@ def test_aave_clone(
 
     assert cloned_strategy.numLenders() == 0
 
-    # Clone the aave lender
-    original_aave = GenericAave.at(strategy.lenders(strategy.numLenders() - 2))
-    tx = original_aave.cloneAaveLender(
-        cloned_strategy, "ClonedAaveUSDC", aUsdc, False, {"from": gov}
+    # Clone the sturdy lender
+    original_sturdy = GenericSturdy.at(strategy.lenders(strategy.numLenders() - 1))
+    tx = original_sturdy.cloneSturdyLender(
+        cloned_strategy, "ClonedSturdyUSDC", sUsdc, False, {"from": gov}
     )
-    cloned_lender = GenericAave.at(tx.return_value)
-    assert cloned_lender.lenderName() == "ClonedAaveUSDC"
+    cloned_lender = GenericSturdy.at(tx.return_value)
+    assert cloned_lender.lenderName() == "ClonedSturdyUSDC"
 
     cloned_strategy.addLender(cloned_lender, {"from": gov})
     
     with brownie.reverts():
-        cloned_lender.initialize['address,bool'](aUsdc, False, {'from': gov})
+        cloned_lender.initialize['address,bool'](sUsdc, False, {'from': gov})
 
     starting_balance = usdc.balanceOf(strategist)
     currency = usdc

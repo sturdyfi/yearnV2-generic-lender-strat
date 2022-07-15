@@ -29,7 +29,7 @@ def test_aave_rewards(chain,
     assert cloned_strategy.numLenders() == 0
 
     # Clone the aave lender
-    original_aave = GenericAave.at(strategy.lenders(strategy.numLenders() - 1))
+    original_aave = GenericAave.at(strategy.lenders(strategy.numLenders() - 2))
     tx = original_aave.cloneAaveLender(
         cloned_strategy, "ClonedAaveUSDC", aUsdc, False, {"from": gov}
     )
@@ -147,7 +147,7 @@ def test_no_emissions(
     assert cloned_strategy.numLenders() == 0
     aSUSD = interface.IAToken("0x6c5024cd4f8a59110119c56f8933403a539555eb")# aSUSD
     # Clone the aave lender
-    original_aave = GenericAave.at(strategy.lenders(strategy.numLenders() - 1))
+    original_aave = GenericAave.at(strategy.lenders(strategy.numLenders() - 2))
     tx = original_aave.cloneAaveLender(
         cloned_strategy, "ClonedAaveSUSD", aSUSD, False, {"from": vault.governance()} 
     )

@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./GenericLenderBase.sol";
 import "../Interfaces/Aave/IAToken.sol";
 import "../Interfaces/Aave/ILendingPool.sol";
+import "../Interfaces/Aave/IPriceOracle.sol";
 import "../Interfaces/Aave/IProtocolDataProvider.sol";
 import "../Interfaces/Aave/IReserveInterestRateStrategy.sol";
 import "../Libraries/Aave/DataTypes.sol";
@@ -123,34 +124,18 @@ contract GenericSturdy is GenericLenderBase {
     function aprAfterDeposit(uint256 extraAmount) external view override returns (uint256) {
         // i need to calculate new supplyRate after Deposit (when deposit has not been done yet)
         DataTypes.ReserveData memory reserveData = _lendingPool().getReserveData(address(want));
+        (uint256 decimals, , , , , , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
+        uint256 liquidityRate = uint256(reserveData.currentLiquidityRate).div(1e9);
+        uint256 newLiquidityRate = _getLiquidityRateAfterDeposit(extraAmount).div(1e9);
+        uint256 sturdyVaultAPR = STURDY_APR_PROVIDER.APR(address(want)).sub(liquidityRate);
+        uint256 totalBorrowableLiquidityInPrice = _getTotalBorrowableLiquidityInPrice();
+        uint256 extraAmountInPrice = extraAmount.mul(_oracle().getAssetPrice(address(want))).div(10**decimals);
 
-        (
-            uint256 availableLiquidity,
-            uint256 totalStableDebt,
-            uint256 totalVariableDebt,
-            ,
-            ,
-            ,
-            uint256 averageStableBorrowRate,
-            ,
-            ,
+        sturdyVaultAPR = sturdyVaultAPR
+            .mul(totalBorrowableLiquidityInPrice)
+            .div(totalBorrowableLiquidityInPrice.add(extraAmountInPrice));
 
-        ) = protocolDataProvider.getReserveData(address(want));
-
-        uint256 newLiquidity = availableLiquidity.add(extraAmount);
-
-        (, , , , uint256 reserveFactor, , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
-
-        (uint256 newLiquidityRate, , ) = IReserveInterestRateStrategy(reserveData.interestRateStrategyAddress).calculateInterestRates(
-            address(want),
-            newLiquidity,
-            totalStableDebt,
-            totalVariableDebt,
-            averageStableBorrowRate,
-            reserveFactor
-        );
-
-        return newLiquidityRate.div(1e9); // divided by 1e9 to go from Ray to Wad
+        return sturdyVaultAPR.add(newLiquidityRate);
     }
 
     function hasAssets() external view override returns (bool) {
@@ -235,6 +220,72 @@ contract GenericSturdy is GenericLenderBase {
 
     function _lendingPool() internal view returns (ILendingPool lendingPool) {
         lendingPool = ILendingPool(protocolDataProvider.ADDRESSES_PROVIDER().getLendingPool());
+    }
+
+    function _oracle() internal view returns (IPriceOracle oracle) {
+        oracle = IPriceOracle(protocolDataProvider.ADDRESSES_PROVIDER().getPriceOracle());
+    }
+
+    function _getTotalBorrowableLiquidityInPrice() internal view returns (uint256) {
+        uint256 totalBorrowableLiquidityInPrice;
+        address[] memory reserves = _lendingPool().getReservesList();
+        uint256 reserveCount = reserves.length;
+
+        for (uint256 i; i < reserveCount; ++i) {
+            (uint256 decimals, , , , , , bool borrowingEnabled, , , ) = protocolDataProvider.getReserveConfigurationData(reserves[i]);
+            if (!borrowingEnabled) continue;
+
+            (
+                uint256 availableLiquidity,
+                uint256 totalStableDebt,
+                uint256 totalVariableDebt,
+                ,
+                ,
+                ,
+                ,
+                ,
+                ,
+
+            ) = protocolDataProvider.getReserveData(reserves[i]);
+            totalBorrowableLiquidityInPrice = totalBorrowableLiquidityInPrice.add(
+                availableLiquidity
+                    .add(totalStableDebt)
+                    .add(totalVariableDebt)
+                    .mul(_oracle().getAssetPrice(reserves[i]))
+                    .div(10**decimals)
+            );
+        }
+
+        return totalBorrowableLiquidityInPrice;
+    }
+
+    function _getLiquidityRateAfterDeposit(uint256 extraAmount) internal view returns (uint256) {
+        DataTypes.ReserveData memory reserveData = _lendingPool().getReserveData(address(want));
+        (uint256 decimals, , , , uint256 reserveFactor, , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
+
+        (
+            uint256 availableLiquidity,
+            uint256 totalStableDebt,
+            uint256 totalVariableDebt,
+            ,
+            ,
+            ,
+            uint256 averageStableBorrowRate,
+            ,
+            ,
+
+        ) = protocolDataProvider.getReserveData(address(want));
+
+        (uint256 newLiquidityRate, , ) = IReserveInterestRateStrategy(reserveData.interestRateStrategyAddress).calculateInterestRates(
+            address(want),
+            availableLiquidity.add(extraAmount),
+            totalStableDebt,
+            totalVariableDebt,
+            averageStableBorrowRate,
+            reserveFactor
+        );
+
+        return newLiquidityRate;
     }
 
     function protectedTokens() internal view override returns (address[] memory) {

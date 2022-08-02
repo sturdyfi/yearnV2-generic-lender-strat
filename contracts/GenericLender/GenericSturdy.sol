@@ -13,6 +13,7 @@ import "../Interfaces/Aave/ILendingPool.sol";
 import "../Interfaces/Aave/IProtocolDataProvider.sol";
 import "../Interfaces/Aave/IReserveInterestRateStrategy.sol";
 import "../Libraries/Aave/DataTypes.sol";
+import "../Interfaces/Sturdy/ISturdyAPRDataProvider.sol";
 
 /********************
  *   A lender plugin for LenderYieldOptimiser for any stable asset on Sturdy
@@ -35,6 +36,7 @@ contract GenericSturdy is GenericLenderBase {
     uint16 internal customReferral;
 
     address public constant WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    ISturdyAPRDataProvider public constant STURDY_APR_PROVIDER = ISturdyAPRDataProvider(0x8F5273205c687508347eb89f81e9b99DA3f01383);
 
     constructor(
         address _strategy,
@@ -173,7 +175,7 @@ contract GenericSturdy is GenericLenderBase {
     }
 
     function _apr() internal view returns (uint256) {
-        return uint256(_lendingPool().getReserveData(address(want)).currentLiquidityRate).div(1e9); // dividing by 1e9 to pass from ray to wad
+        return STURDY_APR_PROVIDER.APR(address(want));
     }
 
     //withdraw an amount including any want balance

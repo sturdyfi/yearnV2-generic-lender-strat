@@ -29,48 +29,34 @@ contract GenericSturdy is GenericLenderBase {
     using SafeMath for uint256;
 
     IProtocolDataProvider public constant protocolDataProvider = IProtocolDataProvider(address(0x960993Cb6bA0E8244007a57544A55bDdb52db97e));
+    ISturdyAPRDataProvider public constant STURDY_APR_PROVIDER = ISturdyAPRDataProvider(0x8F5273205c687508347eb89f81e9b99DA3f01383);
+    address private constant LENDING_POOL = address(0xA422CA380bd70EeF876292839222159E41AAEe17);
+
     IAToken public aToken;
 
     address public keep3r;
 
-    bool public isIncentivised;
     uint16 internal customReferral;
-
-    address public constant WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    ISturdyAPRDataProvider public constant STURDY_APR_PROVIDER = ISturdyAPRDataProvider(0x8F5273205c687508347eb89f81e9b99DA3f01383);
 
     constructor(
         address _strategy,
         string memory name,
-        IAToken _aToken,
-        bool _isIncentivised
+        IAToken _aToken
     ) public GenericLenderBase(_strategy, name) {
-        _initialize(_aToken, _isIncentivised);
+        _initialize(_aToken);
     }
 
-    function initialize(IAToken _aToken, bool _isIncentivised) external {
-        _initialize(_aToken, _isIncentivised);
+    function initialize(IAToken _aToken) external {
+        _initialize(_aToken);
     }
 
     function cloneSturdyLender(
         address _strategy,
         string memory _name,
-        IAToken _aToken,
-        bool _isIncentivised
+        IAToken _aToken
     ) external returns (address newLender) {
         newLender = _clone(_strategy, _name);
-        GenericSturdy(newLender).initialize(_aToken, _isIncentivised);
-    }
-
-    // for the management to activate / deactivate incentives functionality
-    function setIsIncentivised(bool _isIncentivised) external management {
-        // NOTE: if the aToken is not incentivised, getIncentivesController() might revert (aToken won't implement it)
-        // to avoid calling it, we use the OR and lazy evaluation
-        require(
-            !_isIncentivised || address(aToken.getIncentivesController()) != address(0),
-            "!aToken does not have incentives controller set up"
-        );
-        isIncentivised = _isIncentivised;
+        GenericSturdy(newLender).initialize(_aToken);
     }
 
     function setReferralCode(uint16 _customReferral) external management {
@@ -88,7 +74,7 @@ contract GenericSturdy is GenericLenderBase {
 
     //emergency withdraw. sends balance plus amount to governance
     function emergencyWithdraw(uint256 amount) external override onlyGovernance {
-        _lendingPool().withdraw(address(want), amount, address(this));
+        ILendingPool(LENDING_POOL).withdraw(address(want), amount, address(this));
 
         want.safeTransfer(vault.governance(), want.balanceOf(address(this)));
     }
@@ -123,7 +109,7 @@ contract GenericSturdy is GenericLenderBase {
 
     function aprAfterDeposit(uint256 extraAmount) external view override returns (uint256) {
         // i need to calculate new supplyRate after Deposit (when deposit has not been done yet)
-        DataTypes.ReserveData memory reserveData = _lendingPool().getReserveData(address(want));
+        DataTypes.ReserveData memory reserveData = ILendingPool(LENDING_POOL).getReserveData(address(want));
         (uint256 decimals, , , , , , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
         uint256 liquidityRate = uint256(reserveData.currentLiquidityRate).div(1e9);
         uint256 newLiquidityRate = _getLiquidityRateAfterDeposit(extraAmount).div(1e9);
@@ -142,17 +128,12 @@ contract GenericSturdy is GenericLenderBase {
         return aToken.balanceOf(address(this)) > 0;
     }
 
-    function _initialize(IAToken _aToken, bool _isIncentivised) internal {
+    function _initialize(IAToken _aToken) internal {
         require(address(aToken) == address(0), "GenericSturdy already initialized");
 
-        require(
-            !_isIncentivised || address(_aToken.getIncentivesController()) != address(0),
-            "!aToken does not have incentives controller set up"
-        );
-        isIncentivised = _isIncentivised;
         aToken = _aToken;
-        require(_lendingPool().getReserveData(address(want)).aTokenAddress == address(_aToken), "WRONG ATOKEN");
-        IERC20(address(want)).safeApprove(address(_lendingPool()), type(uint256).max);
+        require(ILendingPool(LENDING_POOL).getReserveData(address(want)).aTokenAddress == address(_aToken), "WRONG ATOKEN");
+        IERC20(address(want)).safeApprove(LENDING_POOL, type(uint256).max);
     }
 
     function _nav() internal view returns (uint256) {
@@ -187,10 +168,10 @@ contract GenericSturdy is GenericLenderBase {
 
             if (toWithdraw <= liquidity) {
                 //we can take all
-                _lendingPool().withdraw(address(want), toWithdraw, address(this));
+                ILendingPool(LENDING_POOL).withdraw(address(want), toWithdraw, address(this));
             } else {
                 //take all we can
-                _lendingPool().withdraw(address(want), liquidity, address(this));
+                ILendingPool(LENDING_POOL).withdraw(address(want), liquidity, address(this));
             }
         }
         looseBalance = want.balanceOf(address(this));
@@ -199,14 +180,13 @@ contract GenericSturdy is GenericLenderBase {
     }
 
     function _deposit(uint256 amount) internal {
-        ILendingPool lp = _lendingPool();
         // NOTE: check if allowance is enough and acts accordingly
         // allowance might not be enough if
         //     i) initial allowance has been used (should take years)
         //     ii) lendingPool contract address has changed (Sturdy updated the contract address)
-        if (want.allowance(address(this), address(lp)) < amount) {
-            IERC20(address(want)).safeApprove(address(lp), 0);
-            IERC20(address(want)).safeApprove(address(lp), type(uint256).max);
+        if (want.allowance(address(this), LENDING_POOL) < amount) {
+            IERC20(address(want)).safeApprove(LENDING_POOL, 0);
+            IERC20(address(want)).safeApprove(LENDING_POOL, type(uint256).max);
         }
 
         uint16 referral;
@@ -215,11 +195,7 @@ contract GenericSturdy is GenericLenderBase {
             referral = _customReferral;
         }
 
-        lp.deposit(address(want), amount, address(this), referral);
-    }
-
-    function _lendingPool() internal view returns (ILendingPool lendingPool) {
-        lendingPool = ILendingPool(protocolDataProvider.ADDRESSES_PROVIDER().getLendingPool());
+        ILendingPool(LENDING_POOL).deposit(address(want), amount, address(this), referral);
     }
 
     function _oracle() internal view returns (IPriceOracle oracle) {
@@ -228,7 +204,7 @@ contract GenericSturdy is GenericLenderBase {
 
     function _getTotalBorrowableLiquidityInPrice() internal view returns (uint256) {
         uint256 totalBorrowableLiquidityInPrice;
-        address[] memory reserves = _lendingPool().getReservesList();
+        address[] memory reserves = ILendingPool(LENDING_POOL).getReservesList();
         uint256 reserveCount = reserves.length;
 
         for (uint256 i; i < reserveCount; ++i) {
@@ -260,7 +236,7 @@ contract GenericSturdy is GenericLenderBase {
     }
 
     function _getLiquidityRateAfterDeposit(uint256 extraAmount) internal view returns (uint256) {
-        DataTypes.ReserveData memory reserveData = _lendingPool().getReserveData(address(want));
+        DataTypes.ReserveData memory reserveData = ILendingPool(LENDING_POOL).getReserveData(address(want));
         (uint256 decimals, , , , uint256 reserveFactor, , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
 
         (

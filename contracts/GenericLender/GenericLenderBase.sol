@@ -90,7 +90,7 @@ abstract contract GenericLenderBase is IGenericLender {
 
     modifier management() {
         require(
-            msg.sender == address(strategy) || msg.sender == vault.governance() || msg.sender == IBaseStrategy(strategy).management(),
+            msg.sender == address(strategy) || msg.sender == vault.governance() || msg.sender == IBaseStrategy(strategy).strategist(),
             "!management"
         );
         _;

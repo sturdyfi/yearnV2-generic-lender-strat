@@ -40,23 +40,21 @@ contract GenericSturdy is GenericLenderBase {
 
     constructor(
         address _strategy,
-        string memory name,
-        IAToken _aToken
+        string memory name
     ) public GenericLenderBase(_strategy, name) {
-        _initialize(_aToken);
+        _initialize();
     }
 
-    function initialize(IAToken _aToken) external {
-        _initialize(_aToken);
+    function initialize() external {
+        _initialize();
     }
 
     function cloneSturdyLender(
         address _strategy,
-        string memory _name,
-        IAToken _aToken
+        string memory _name
     ) external returns (address newLender) {
         newLender = _clone(_strategy, _name);
-        GenericSturdy(newLender).initialize(_aToken);
+        GenericSturdy(newLender).initialize();
     }
 
     function setReferralCode(uint16 _customReferral) external management {
@@ -110,9 +108,9 @@ contract GenericSturdy is GenericLenderBase {
     function aprAfterDeposit(uint256 extraAmount) external view override returns (uint256) {
         // i need to calculate new supplyRate after Deposit (when deposit has not been done yet)
         DataTypes.ReserveData memory reserveData = ILendingPool(LENDING_POOL).getReserveData(address(want));
-        (uint256 decimals, , , , , , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
+        (uint256 decimals, , , , uint256 reserveFactor, , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
         uint256 liquidityRate = uint256(reserveData.currentLiquidityRate).div(1e9);
-        uint256 newLiquidityRate = _getLiquidityRateAfterDeposit(extraAmount).div(1e9);
+        uint256 newLiquidityRate = _getLiquidityRateAfterDeposit(reserveData, extraAmount, reserveFactor).div(1e9);
         uint256 sturdyVaultAPR = STURDY_APR_PROVIDER.APR(address(want)).sub(liquidityRate);
         uint256 totalBorrowableLiquidityInPrice = _getTotalBorrowableLiquidityInPrice();
         uint256 extraAmountInPrice = extraAmount.mul(_oracle().getAssetPrice(address(want))).div(10**decimals);
@@ -125,14 +123,11 @@ contract GenericSturdy is GenericLenderBase {
     }
 
     function hasAssets() external view override returns (bool) {
-        return aToken.balanceOf(address(this)) > 0;
+        return _nav() > 0;
     }
 
-    function _initialize(IAToken _aToken) internal {
-        require(address(aToken) == address(0), "GenericSturdy already initialized");
-
-        aToken = _aToken;
-        require(ILendingPool(LENDING_POOL).getReserveData(address(want)).aTokenAddress == address(_aToken), "WRONG ATOKEN");
+    function _initialize() internal {
+        aToken = IAToken(ILendingPool(LENDING_POOL).getReserveData(address(want)).aTokenAddress);
         IERC20(address(want)).safeApprove(LENDING_POOL, type(uint256).max);
     }
 
@@ -202,8 +197,7 @@ contract GenericSturdy is GenericLenderBase {
         oracle = IPriceOracle(protocolDataProvider.ADDRESSES_PROVIDER().getPriceOracle());
     }
 
-    function _getTotalBorrowableLiquidityInPrice() internal view returns (uint256) {
-        uint256 totalBorrowableLiquidityInPrice;
+    function _getTotalBorrowableLiquidityInPrice() internal view returns (uint256 totalBorrowableLiquidityInPrice) {
         address[] memory reserves = ILendingPool(LENDING_POOL).getReservesList();
         uint256 reserveCount = reserves.length;
 
@@ -231,13 +225,13 @@ contract GenericSturdy is GenericLenderBase {
                     .div(10**decimals)
             );
         }
-
-        return totalBorrowableLiquidityInPrice;
     }
 
-    function _getLiquidityRateAfterDeposit(uint256 extraAmount) internal view returns (uint256) {
-        DataTypes.ReserveData memory reserveData = ILendingPool(LENDING_POOL).getReserveData(address(want));
-        (uint256 decimals, , , , uint256 reserveFactor, , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
+    function _getLiquidityRateAfterDeposit(
+        DataTypes.ReserveData memory reserveData, 
+        uint256 extraAmount, 
+        uint256 reserveFactor
+    ) internal view returns (uint256) {
 
         (
             uint256 availableLiquidity,
@@ -276,7 +270,7 @@ contract GenericSturdy is GenericLenderBase {
             msg.sender == address(keep3r) ||
                 msg.sender == address(strategy) ||
                 msg.sender == vault.governance() ||
-                msg.sender == IBaseStrategy(strategy).management(),
+                msg.sender == IBaseStrategy(strategy).strategist(),
             "!keepers"
         );
         _;

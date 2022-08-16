@@ -26,6 +26,8 @@ interface IBaseStrategy {
     function harvest() external;
 
     function management() external view returns (address);
+
+    function strategist() external view returns (address);
 }
 
 abstract contract GenericLenderBase is IGenericLender {

@@ -389,4 +389,8 @@ interface ILendingPool {
     function setPause(bool val) external;
 
     function paused() external view returns (bool);
+
+    function registerVault(address _vaultAddress) external;
+
+    function depositYield(address asset, uint256 amount) external;
 }

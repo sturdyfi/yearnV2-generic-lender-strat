@@ -4,7 +4,7 @@ from useful_methods import genericStateOfVault, genericStateOfStrat
 import random
 import brownie
 
-def test_aave_clone(
+def test_sturdy_clone(
     chain,
     usdc,
     whale,
@@ -15,7 +15,8 @@ def test_aave_clone(
     Strategy,
     strategy,
     GenericSturdy,
-    sUsdc,
+    lendingPool,
+    lendingPoolConfigurator,
 ):
     # Clone magic
     tx = strategy.clone(vault)
@@ -32,7 +33,7 @@ def test_aave_clone(
     # Clone the sturdy lender
     original_sturdy = GenericSturdy.at(strategy.lenders(strategy.numLenders() - 1))
     tx = original_sturdy.cloneSturdyLender(
-        cloned_strategy, "ClonedSturdyUSDC", sUsdc, False, {"from": gov}
+        cloned_strategy, "ClonedSturdyUSDC", {"from": gov}
     )
     cloned_lender = GenericSturdy.at(tx.return_value)
     assert cloned_lender.lenderName() == "ClonedSturdyUSDC"
@@ -40,7 +41,7 @@ def test_aave_clone(
     cloned_strategy.addLender(cloned_lender, {"from": gov})
     
     with brownie.reverts():
-        cloned_lender.initialize['address,bool'](sUsdc, False, {'from': gov})
+        cloned_lender.initialize({'from': gov})
 
     starting_balance = usdc.balanceOf(strategist)
     currency = usdc
@@ -75,6 +76,11 @@ def test_aave_clone(
     whale_deposit = 100_000 * (10 ** (decimals))
     vault.deposit(whale_deposit, {"from": whale})
     assert cloned_strategy.harvestTrigger(1000) == True
+
+    # making yield in sturdy pool
+    usdc.approve(lendingPool, 1000 * (10 ** (decimals)), {"from": whale})
+    lendingPool.registerVault(whale, {"from": lendingPoolConfigurator})
+    lendingPool.depositYield(usdc.address, 1000 * (10 ** (decimals)), {"from": whale})
 
     cloned_strategy.harvest({"from": strategist})
 

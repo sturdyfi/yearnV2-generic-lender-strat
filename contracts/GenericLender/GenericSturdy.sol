@@ -259,14 +259,4 @@ contract GenericSturdy is GenericLenderBase {
         protected[1] = address(aToken);
         return protected;
     }
-
-    modifier keepers() {
-        require(
-            msg.sender == address(strategy) ||
-            msg.sender == vault.governance() ||
-            msg.sender == IBaseStrategy(strategy).strategist(),
-            "!keepers"
-        );
-        _;
-    }
 }

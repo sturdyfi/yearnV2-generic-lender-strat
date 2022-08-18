@@ -34,8 +34,6 @@ contract GenericSturdy is GenericLenderBase {
 
     IAToken public aToken;
 
-    address public keep3r;
-
     uint16 internal customReferral;
 
     constructor(
@@ -60,10 +58,6 @@ contract GenericSturdy is GenericLenderBase {
     function setReferralCode(uint16 _customReferral) external management {
         require(_customReferral != 0, "!invalid referral code");
         customReferral = _customReferral;
-    }
-
-    function setKeep3r(address _keep3r) external management {
-        keep3r = _keep3r;
     }
 
     function withdraw(uint256 amount) external override management returns (uint256) {
@@ -141,9 +135,8 @@ contract GenericSturdy is GenericLenderBase {
 
     //withdraw an amount including any want balance
     function _withdraw(uint256 amount) internal returns (uint256) {
-        uint256 balanceUnderlying = aToken.balanceOf(address(this));
         uint256 looseBalance = want.balanceOf(address(this));
-        uint256 total = balanceUnderlying.add(looseBalance);
+        uint256 total = aToken.balanceOf(address(this)).add(looseBalance);
 
         if (amount > total) {
             //cant withdraw more than we own
@@ -200,9 +193,11 @@ contract GenericSturdy is GenericLenderBase {
     function _getTotalBorrowableLiquidityInPrice() internal view returns (uint256 totalBorrowableLiquidityInPrice) {
         address[] memory reserves = ILendingPool(LENDING_POOL).getReservesList();
         uint256 reserveCount = reserves.length;
+        address reserve;
 
         for (uint256 i; i < reserveCount; ++i) {
-            (uint256 decimals, , , , , , bool borrowingEnabled, , , ) = protocolDataProvider.getReserveConfigurationData(reserves[i]);
+            reserve = reserves[i];
+            (uint256 decimals, , , , , , bool borrowingEnabled, , , ) = protocolDataProvider.getReserveConfigurationData(reserve);
             if (!borrowingEnabled) continue;
 
             (
@@ -216,12 +211,12 @@ contract GenericSturdy is GenericLenderBase {
                 ,
                 ,
 
-            ) = protocolDataProvider.getReserveData(reserves[i]);
+            ) = protocolDataProvider.getReserveData(reserve);
             totalBorrowableLiquidityInPrice = totalBorrowableLiquidityInPrice.add(
                 availableLiquidity
                     .add(totalStableDebt)
                     .add(totalVariableDebt)
-                    .mul(_oracle().getAssetPrice(reserves[i]))
+                    .mul(_oracle().getAssetPrice(reserve))
                     .div(10**decimals)
             );
         }
@@ -267,10 +262,9 @@ contract GenericSturdy is GenericLenderBase {
 
     modifier keepers() {
         require(
-            msg.sender == address(keep3r) ||
-                msg.sender == address(strategy) ||
-                msg.sender == vault.governance() ||
-                msg.sender == IBaseStrategy(strategy).strategist(),
+            msg.sender == address(strategy) ||
+            msg.sender == vault.governance() ||
+            msg.sender == IBaseStrategy(strategy).strategist(),
             "!keepers"
         );
         _;

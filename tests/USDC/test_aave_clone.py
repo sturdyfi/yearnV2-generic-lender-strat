@@ -30,7 +30,7 @@ def test_aave_clone(
     assert cloned_strategy.numLenders() == 0
 
     # Clone the aave lender
-    original_aave = GenericAave.at(strategy.lenders(strategy.numLenders() - 2))
+    original_aave = GenericAave.at(strategy.lenders(strategy.numLenders() - 1))
     tx = original_aave.cloneAaveLender(
         cloned_strategy, "ClonedAaveUSDC", aUsdc, False, {"from": gov}
     )

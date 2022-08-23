@@ -1,16 +1,12 @@
-from itertools import count
-from brownie import Wei, reverts
-from useful_methods import genericStateOfVault, genericStateOfStrat
 import random
 import brownie
 
-def test_sturdy_clone(
+def test_clone(
     chain,
     usdc,
     whale,
     gov,
     strategist,
-    rando,
     vault,
     Strategy,
     strategy,
@@ -62,7 +58,7 @@ def test_sturdy_clone(
 
     assert cloned_strategy.estimatedTotalAssets() == 0
     chain.mine(1)
-    assert cloned_strategy.harvestTrigger(1) == True
+    assert cloned_strategy.harvestTrigger(1000000000) == True
 
     cloned_strategy.harvest({"from": strategist})
 
@@ -70,12 +66,12 @@ def test_sturdy_clone(
         cloned_strategy.estimatedTotalAssets() >= depositAmount * 0.999999
     )  # losing some dust is ok
 
-    assert cloned_strategy.harvestTrigger(1) == False
+    assert cloned_strategy.harvestTrigger(1000000000) == False
 
     # whale deposits as well
     whale_deposit = 100_000 * (10 ** (decimals))
     vault.deposit(whale_deposit, {"from": whale})
-    assert cloned_strategy.harvestTrigger(1000) == True
+    assert cloned_strategy.harvestTrigger(1000000000) == True
 
     # making yield in sturdy pool
     usdc.approve(lendingPool, 1000 * (10 ** (decimals)), {"from": whale})

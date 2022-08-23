@@ -134,14 +134,6 @@ def crUsdc(interface):
 def aUsdc(interface):
     yield interface.IAToken("0xBcca60bB61934080951369a648Fb03DF4F96263C")
 
-@pytest.fixture
-def lendingPool(interface):
-    yield interface.ILendingPool("0xA422CA380bd70EeF876292839222159E41AAEe17")
-
-@pytest.fixture
-def lendingPoolConfigurator(accounts):
-    yield accounts.at("0x46339B1B9bC2145FCd272AFc99002a931f8C2cFf", force=True)
-
 
 @pytest.fixture(scope="module", autouse=True)
 def shared_setup(module_isolation):
@@ -172,7 +164,6 @@ def strategy(
     GenericCream,
     GenericDyDx,
     GenericAave,
-    GenericSturdy,
     chain
 ):
     strategy = strategist.deploy(Strategy, vault)
@@ -184,7 +175,6 @@ def strategy(
     creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdc)
     dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
     aavePlugin = strategist.deploy(GenericAave, strategy, "Aave", aUsdc, False)
-    sturdyPlugin = strategist.deploy(GenericSturdy, strategy, "Sturdy")
 
     strategy.addLender(creamPlugin, {"from": gov})
     assert strategy.numLenders() == 1
@@ -194,7 +184,5 @@ def strategy(
     assert strategy.numLenders() == 3
     strategy.addLender(aavePlugin, {"from": gov})
     assert strategy.numLenders() == 4
-    strategy.addLender(sturdyPlugin, {"from": gov})
-    assert strategy.numLenders() == 5
 
     yield strategy

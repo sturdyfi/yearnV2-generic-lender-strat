@@ -9,6 +9,6 @@
     "scripts": {
         "prettier": "prettier --write 'contracts/**/*.sol'",
         "compile": "brownie compile",
-        "test": "brownie test tests/USDC/test_sturdy_clone.py"
+        "test": "brownie test tests/Sturdy"
     }
 }

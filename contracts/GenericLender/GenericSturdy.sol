@@ -29,7 +29,7 @@ contract GenericSturdy is GenericLenderBase {
     using SafeMath for uint256;
 
     IProtocolDataProvider public constant protocolDataProvider = IProtocolDataProvider(address(0x960993Cb6bA0E8244007a57544A55bDdb52db97e));
-    ISturdyAPRDataProvider public constant STURDY_APR_PROVIDER = ISturdyAPRDataProvider(0x8F5273205c687508347eb89f81e9b99DA3f01383);
+    ISturdyAPRDataProvider public constant STURDY_APR_PROVIDER = ISturdyAPRDataProvider(0xAC2EfC7Ec1e06883b181aA167BF2e1feb07615A3);
     address private constant LENDING_POOL = address(0xA422CA380bd70EeF876292839222159E41AAEe17);
 
     IAToken public aToken;
@@ -103,9 +103,8 @@ contract GenericSturdy is GenericLenderBase {
         // i need to calculate new supplyRate after Deposit (when deposit has not been done yet)
         DataTypes.ReserveData memory reserveData = ILendingPool(LENDING_POOL).getReserveData(address(want));
         (uint256 decimals, , , , uint256 reserveFactor, , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
-        uint256 liquidityRate = uint256(reserveData.currentLiquidityRate).div(1e9);
         uint256 newLiquidityRate = _getLiquidityRateAfterDeposit(reserveData, extraAmount, reserveFactor).div(1e9);
-        uint256 sturdyVaultAPR = STURDY_APR_PROVIDER.APR(address(want)).sub(liquidityRate);
+        uint256 sturdyVaultAPR = STURDY_APR_PROVIDER.APR(address(want), true);
         uint256 totalBorrowableLiquidityInPrice = _getTotalBorrowableLiquidityInPrice();
         uint256 extraAmountInPrice = extraAmount.mul(_oracle().getAssetPrice(address(want))).div(10**decimals);
 
@@ -130,7 +129,9 @@ contract GenericSturdy is GenericLenderBase {
     }
 
     function _apr() internal view returns (uint256) {
-        return STURDY_APR_PROVIDER.APR(address(want));
+        DataTypes.ReserveData memory reserveData = ILendingPool(LENDING_POOL).getReserveData(address(want));
+        uint256 liquidityRate = uint256(reserveData.currentLiquidityRate).div(1e9);
+        return STURDY_APR_PROVIDER.APR(address(want), true).add(liquidityRate);
     }
 
     //withdraw an amount including any want balance

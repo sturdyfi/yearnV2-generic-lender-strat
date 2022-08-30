@@ -35,6 +35,13 @@ def test_logic(
     assert sturdyPlugin.nav() == sturdyPlugin.underlyingBalanceStored()
 
     deposit(amount, whale, usdc, vault)
+
+    # making yield in sturdy pool to make apr
+    usdc.approve(lendingPool, 1000 * (10 ** (decimals)), {"from": whale})
+    lendingPool.registerVault(whale, {"from": lendingPoolConfigurator})
+    lendingPool.depositYield(usdc.address, 1000 * (10 ** (decimals)), {"from": whale})
+    sleep(chain, 10)
+
     apr = sturdyPlugin.apr()
     aprAfter = sturdyPlugin.aprAfterDeposit(amount)
     assert apr > aprAfter

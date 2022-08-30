@@ -11,8 +11,19 @@ def test_setup(
 def test_apr(
     GenericSturdy,
     strategy,
+    lendingPool,
+    lendingPoolConfigurator,
+    whale,
+    usdc
 ):
     sturdyPlugin = GenericSturdy.at(strategy.lenders(strategy.numLenders() - 1))
+
+    # making yield in sturdy pool to make apr
+    decimals = usdc.decimals()
+    usdc.approve(lendingPool, 1000 * (10 ** (decimals)), {"from": whale})
+    lendingPool.registerVault(whale, {"from": lendingPoolConfigurator})
+    lendingPool.depositYield(usdc.address, 1000 * (10 ** (decimals)), {"from": whale})
+
     apr = sturdyPlugin.apr()
 
     assert apr > 0

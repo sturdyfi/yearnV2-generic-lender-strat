@@ -120,6 +120,8 @@ contract GenericSturdy is GenericLenderBase {
     }
 
     function _initialize() internal {
+        require(address(aToken) == address(0), "GenericSturdy already initialized");
+
         aToken = IAToken(ILendingPool(LENDING_POOL).getReserveData(address(want)).aTokenAddress);
         IERC20(address(want)).safeApprove(LENDING_POOL, type(uint256).max);
     }
